@@ -1,0 +1,82 @@
+1.url
+	<property name="url" value="jdbc:mysql://localhost:3306/u3_practice1?useUnicode=true&amp;characterEncoding=gbk&amp;zeroDateTimeBehavior=convertToNull" />
+	
+2.mapper
+	  <resultMap id="GoodResultMap" type="com.kgc.entity.Good" extends="BaseResultMap">
+		<association property="goodtype" resultMap="com.kgc.dao.GoodtypeMapper.BaseResultMap"></association>
+	  </resultMap>
+	  <select id="findAll" resultMap="GoodResultMap">
+		SELECT g.*,t.goodType_name
+		FROM good g LEFT JOIN goodtype t ON g.goodType_id=t.goodType_id
+		<where>
+		  <if test="goodName!=null">
+			and good_name like concat('%',#{goodName},'%')
+		  </if>
+		</where>
+	  </select>
+ 
+3.test
+
+	private ApplicationContext app;
+    private GoodMapper goodMapper;
+
+    @Before
+    public void before() {
+        app = new ClassPathXmlApplicationContext("classpath:spring/applicationContext*.xml");
+        goodMapper = (GoodMapper) app.getBean("goodMapper", GoodMapper.class);
+    }
+
+    @Test
+    public void testFindAll(){
+        Good good = new Good();
+        List<Good> all = goodMapper.findAll(good);
+        for (Good good1 : all) {
+            System.out.println(good1);
+        }
+    }
+	
+4.date
+
+    @DateTimeFormat(pattern = "yyyy-MM-dd")
+    private Date createDate;
+
+5.查询返回Map
+	
+	@RequestMapping("good/list")
+    @ResponseBody
+    public Map findAll(Good good, Goodtype goodtype,
+                            @RequestParam(value = "page",required = false,defaultValue = "1")int page,
+                            @RequestParam(value = "limit",required = false,defaultValue = "3")int limit){
+        PageInfo<Good> pageInfo = goodService.findAll(good, goodtype, page, limit);
+        Map map = new HashMap<>();
+        map.put("code", 0);
+        map.put("msg", "查询成功");
+        map.put("count", pageInfo.getTotal());
+        map.put("data", pageInfo.getList());
+        return map;
+    }
+
+6.页面信息显示
+	, {field: 'createDate', title: '创建时间', templet: function (d) {
+			return '' + layui.util.toDateString(d.createDate, 'yyyy-MM-dd HH:mm:ss') + '';
+		}
+	}
+	, {field: 'goodtype', title: '类型名称',templet:function (t){
+		return t.goodtype.goodtypeName;
+		}}
+
+7.Date 数据库url
+
+	加上&zeroDateTimeBehavior=convertToNull
+	 “0000-00-00 00:00:00”在mysql中是作为一个特殊值存在的，但是在Java中， java.sql.Date 会被视为 不合法的值，被JVM认为格式不正确。
+	 
+8.使用criteria的like方法
+	criteria.andGoodNameLike("%"+"1"+"%");
+	
+9.*(超级奇葩的问题)
+	strDate = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+    + ' ' + date.getHours() + ':' + date.getMinutes() + ':' + date.getSeconds();
+	
+	date.getDate() 表示年月日中的日;
+	date.getDay() 表示星期几（0-6）;
+	如果用错了会引发大问题，涉及数据库的增改，因为碰到星期天时日期会是XXXX/XX/0,这个0在这明显是非法的但是报错不会提示这个0，直接报空指针异常等等.
